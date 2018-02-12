@@ -90,11 +90,11 @@ offsets = {}
 if istlog and args.format == 'csv': # we know our fields from the get-go
     try:
         currentOffset = 1 # Store how many fields in we are for each message.
-        for type in types:
+        for msg_type in types:
             try:
-                typeClass = "MAVLink_{0}_message".format(type.lower())
-                fields += [type + '.' + x for x in inspect.getargspec(getattr(mavutil.mavlink, typeClass).__init__).args[1:]]
-                offsets[type] = currentOffset
+                typeClass = "MAVLink_{0}_message".format(msg_type.lower())
+                fields += [msg_type + '.' + x for x in inspect.getargspec(getattr(mavutil.mavlink, typeClass).__init__).args[1:]]
+                offsets[msg_type] = currentOffset
                 currentOffset += len(fields)
             except IndexError:
                 quit()
@@ -200,7 +200,7 @@ while True:
     # CSV format outputs columnar data with a user-specified delimiter
     elif args.format == 'csv':
         data = m.to_dict()
-        type = m.get_type()
+        msg_type = m.get_type()
 
         # If this message has a duplicate timestamp, copy its data into the existing data list. Also
         # do this if it's the first message encountered.
@@ -208,7 +208,7 @@ while True:
             if isbin:
                 newData = [str(data[y]) if y != "timestamp" else "" for y in fields]
             else:
-                newData = [str(data[y.split('.')[-1]]) if y.split('.')[0] == type and y.split('.')[-1] in data else "" for y in fields]
+                newData = [str(data[y.split('.')[-1]]) if y.split('.')[0] == msg_type and y.split('.')[-1] in data else "" for y in fields]
 
             for i, val in enumerate(newData):
                 if val:
@@ -221,7 +221,7 @@ while True:
             if isbin:
                 csv_out = [str(data[y]) if y != "timestamp" else "" for y in fields]
             else:
-                csv_out = [str(data[y.split('.')[-1]]) if y.split('.')[0] == type and y.split('.')[-1] in data else "" for y in fields]
+                csv_out = [str(data[y.split('.')[-1]]) if y.split('.')[0] == msg_type and y.split('.')[-1] in data else "" for y in fields]
     # Otherwise we output in a standard Python dict-style format
     else:
         s = "%s.%02u: %s" % (time.strftime("%Y-%m-%d %H:%M:%S",
