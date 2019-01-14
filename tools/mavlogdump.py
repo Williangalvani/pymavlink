@@ -136,7 +136,7 @@ if types is not None and hasattr(mlog, 'name_to_id'):
 
 # Keep track of data from the current timestep. If the following timestep has the same data, it's stored in here as well. Output should therefore have entirely unique timesteps.
 while True:
-    m = mlog.recv_match(blocking=args.follow, type=match_types)
+    m = mlog.recv_match(type=match_types)
     if m is None:
         if args.follow: # Restart the loop waiting for new data instead of breaking it
             time.sleep(0.001)
