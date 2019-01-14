@@ -138,6 +138,9 @@ if types is not None and hasattr(mlog, 'name_to_id'):
 while True:
     m = mlog.recv_match(blocking=args.follow, type=match_types)
     if m is None:
+        if args.follow: # Restart the loop waiting for new data instead of breaking it
+            time.sleep(0.001)
+            continue
         # FIXME: Make sure to output the last CSV message before dropping out of this loop
         break
     available_types.add(m.get_type())
