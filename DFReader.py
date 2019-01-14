@@ -559,7 +559,7 @@ class DFReader(object):
             self.params[m.Name] = m.Value
         self._set_time(m)
 
-    def recv_match(self, condition=None, type=None, blocking=False):
+    def recv_match(self, condition=None, type=None):
         '''recv the next message that matches the given condition
         type can be a string or a list of strings'''
         if type is not None:
