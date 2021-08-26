@@ -915,11 +915,12 @@ class mavudp(mavfile):
                 current_time = time.time()
                 to_remove = set()
                 for address in self.clients:
-                    if self.clients_last_alive[address] + self.timeout > current_time:
+                    if len(self.clients) == 1 or self.clients_last_alive[address] + self.timeout > current_time:
                         self.port.sendto(buf, address)
-                    elif len(self.clients) > 1:
+                    elif len(self.clients) > 1 and len(to_remove) < len(self.clients) - 1:
                         # we keep always at least 1 client, so we don't break old behavior
                         to_remove.add(address)
+                        self.clients_last_alive.pop(address)
                 self.clients -= to_remove
             else:
                 if self.last_address and self.broadcast:
