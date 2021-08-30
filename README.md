@@ -1,4 +1,9 @@
 [![Build Status](https://travis-ci.org/ArduPilot/pymavlink.svg?branch=master)](https://travis-ci.org/ArduPilot/pymavlink)
+
+
+## THIS IS A MODIFIED VERSION FOR GENERATING MAVLINK.JS FOR PLOT.ARDUPILOT.ORG
+
+
 # Pymavlink
 This is a Python implementation of the MAVLink protocol.
 It includes a source code generator (generator/mavgen.py) to create MAVLink protocol implementations for other programming languages as well.
