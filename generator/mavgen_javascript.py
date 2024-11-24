@@ -195,7 +195,7 @@ ${MAVHEAD}.message.prototype.pack = function(mav, crc_extra, payload) {
     """)
 
     t.write(outf, """
-// signing is our first incompat aaaaflag.
+// signing is our first incompat flag.
     var incompat_flags = 0;
     if (mav.signing.sign_outgoing){
             incompat_flags |= ${MAVHEAD}.MAVLINK_IFLAG_SIGNED
@@ -1043,6 +1043,82 @@ MAVLink20Processor.prototype.toMavlink2RestV1Format = function(message) {
   obj["message"]["type"] = message._name
   return obj
 }
+
+
+MAVLink20Processor.prototype.convertEnumValue = function(restMessage) {
+    // iterate over all dicts in mavlink20 and check if the value is in the dict
+    for (const dictName in mavlink20) {
+        const dict = mavlink20[dictName];
+        if (typeof dict === 'object') {
+            for (const key in dict) {
+                if (key === restMessage) {
+                    return dict[key]
+                }
+             }
+         }
+    }
+    throw new Error('Enum value not found:' + restMessage);
+}
+
+
+MAVLink20Processor.prototype.fromMavlink2RestV1Format = function(restMessage) {
+  // Parse if string
+  if (typeof restMessage === 'string') {
+      restMessage = JSON.parse(restMessage);
+  }
+
+  const { header, message } = restMessage;
+
+  // Get the message type
+  const messageType = message.type.toLowerCase();
+  const MessageClass = mavlink20.messages[messageType];
+  if (!MessageClass) {
+      throw new Error('MAVLink message type not found' + message.type);
+  }
+
+  if ("mavtype" in message) {
+    message.type = message.mavtype
+    delete(message.mavtype)
+  }
+
+
+  // Create a temporary instance to get the field information
+  const tempInstance = new MessageClass();
+
+  // Create ordered array of values based on fieldnames
+  const orderedValues = tempInstance.fieldnames.map(fieldName => {
+      let value = message[fieldName];
+
+      // Skip if value doesn't exist (might be set by constructor)
+      if (value === undefined) {
+          return undefined;
+      }
+
+      // Handle enum objects
+      if (value && typeof value === 'object') {
+          if ('type' in value) {
+              return this.convertEnumValue(value.type);
+          }
+          if ('bits' in value) {
+              return value.bits;
+          }
+          // Handle nested objects like mavtype
+          for (const key in value) {
+              if (typeof value[key] === 'object' && 'type' in value[key]) {
+                  return this.convertEnumValue(value[key].type);
+              }
+          }
+      }
+
+      return value;
+  }).filter(v => v !== undefined);
+
+  // Create and pack the message
+  const mavlinkMessage = new MessageClass(...orderedValues);
+  const packed = mavlinkMessage.pack(this);
+  return new Uint8Array(packed).buffer;
+}
+
 
 """, {'MAVHEAD': get_mavhead(xml), 'MAVPROCESSOR': get_mavprocessor(xml), 'PROTOCOL_MARKER' : xml.protocol_marker})
 
