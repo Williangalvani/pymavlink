@@ -290,37 +290,25 @@ def generate_classes(outf, msgs, xml):
 """ % (comment))
 
         # function signature + declaration
-        outf.write("%s.messages.%s = function(" % ( get_mavhead(xml), m.name.lower() ) )
+        outf.write(f"{get_mavhead(xml)}.messages.{m.name.lower()} = function(")
         outf.write(" ...moreargs ) {\n")
         # passing the dynamic args into the correct attributes, we can call the constructor with or without the 'moreargs'
         outf.write("    [ this.%s ] = moreargs;\n" % " , this.".join(argfieldnames))
         outf.write(conststr)
 
         # body: set message type properties
-        outf.write("""
-    this._format = '%s';
-    this._id = %s.MAVLINK_MSG_ID_%s;
-    this.order_map = %s;
-    this.len_map = %s;
-    this.array_len_map = %s;
-    this.crc_extra = %u;
-    this._name = '%s';
+        outf.write(f"""
+    this._format = '{m.fmtstr}';
+    this._id = {get_mavhead(xml)}.MAVLINK_MSG_ID_{m.name.upper()};
+    this.order_map = {m.order_map};
+    this.len_map = {m.len_map};
+    this.array_len_map = {m.array_len_map};
+    this.crc_extra = {m.crc_extra};
+    this._name = '{m.name.upper()}';
 
-    this._instance_field = %s;
-    this._instance_offset = %d;
-
-"""     % (
-        m.fmtstr,
-        get_mavhead(xml),
-        m.name.upper(),
-        m.order_map,
-        m.len_map,
-        m.array_len_map,
-        m.crc_extra,
-        m.name.upper(),
-        instance_field,
-        instance_offset
-        ))
+    this._instance_field = {instance_field};
+    this._instance_offset = {instance_offset};
+""")
 
         # body: set own properties
         if len(m.fieldnames) != 0:
@@ -329,7 +317,7 @@ def generate_classes(outf, msgs, xml):
         outf.write("\n}\n")
 
         # inherit methods from the base message class
-        outf.write("\n%s.messages.%s.prototype = new %s.message;\n" % ( get_mavhead(xml), m.name.lower() ,get_mavhead(xml) ) )
+        outf.write(f"\n{get_mavhead(xml)}.messages.{m.name.lower()}.prototype = new {get_mavhead(xml)}.message;\n")
 
         orderedfields =    "var orderedfields = [ this." + ", this.".join(m.ordered_fieldnames) + "];";
 
