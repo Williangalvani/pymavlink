@@ -229,12 +229,14 @@ def generate_enums(outf, enums, xml):
     outf.write("\n// enums\n")
     wrapper = textwrap.TextWrapper(initial_indent="", subsequent_indent="                        // ")
     for e in enums:
+        outf.write(f"{get_mavhead(xml)}.{e.name} = {{\n")
         outf.write("\n// %s\n" % e.name)
         for entry in e.entry:
-            t.write(outf, "${MAVHEAD}.${ENUMNAME} = ${ENUMVAL} // ${ENUMDESC}\n", {'ENUMNAME': entry.name,
+            t.write(outf, "${ENUMNAME}: ${ENUMVAL}, // ${ENUMDESC}\n", {'ENUMNAME': entry.name,
                                                                                 'ENUMVAL': entry.value,
                                                                                 'ENUMDESC': wrapper.fill(entry.description),
                                                                                 'MAVHEAD': get_mavhead(xml)})
+        outf.write("}\n\n")
 
 def generate_message_ids(outf, msgs, xml):
     print("Generating message IDs")
@@ -313,7 +315,9 @@ def generate_classes(outf, msgs, xml):
         # body: set own properties
         if len(m.fieldnames) != 0:
                 outf.write("    this.fieldnames = ['%s'];\n" % "', '".join(m.fieldnames))
-
+                cleaned_up_field_enums = [f"'{f.name}'" if f else 'null' for f in m.field_enums]
+                outf.write("    this.field_enums = [%s];\n" % ", ".join(cleaned_up_field_enums))
+                outf.write(("    this.field_bitmasks = %s;\n" % m.field_bitmasks).lower())
         outf.write("\n}\n")
 
         # inherit methods from the base message class
@@ -359,10 +363,9 @@ def generate_mavlink_class(outf, msgs, xml):
     print("Generating MAVLink class")
 
     # Write mapper to enable decoding based on the integer message type
-    t.write(outf, "\n\n${MAVHEAD}.map = {\n", {'MAVHEAD': get_mavhead(xml)});
+    t.write(outf, f"\n\n{get_mavhead(xml)}.map = {{\n", {'MAVHEAD': get_mavhead(xml)});
     for m in msgs:
-        outf.write("        %s: { format: '%s', type: %s.messages.%s, order_map: %s, crc_extra: %u },\n" % (
-            m.id, m.fmtstr, get_mavhead(xml), m.name.lower(), m.order_map, m.crc_extra))
+        outf.write(f"        {m.id}: {{ format: '{m.fmtstr}', type: {get_mavhead(xml)}.messages.{m.name.lower()}, order_map: {m.order_map}, crc_extra: {m.crc_extra} }},\n")
     outf.write("}\n\n")
 
     t.write(outf, """
@@ -418,9 +421,11 @@ const ${MAVPROCESSOR}= function(logger, srcSystem, srcComponent) {
     this.total_bytes_received = 0;
     this.total_receive_errors = 0;
     this.startup_time = Date.now();
+    this.reverseDicts = {}
 
     // optional , but when used we store signing state in this object:
     this.signing = new MAVLinkSigning();
+
 }
 
 // Implements EventEmitter
@@ -972,6 +977,71 @@ unpacked = jspack.Unpack('cBBBBB', msgbuf.slice(0, 6));
     m._header = new ${MAVHEAD}.header(msgId, mlen, seq, srcSystem, srcComponent, incompat_flags, compat_flags);
     this.log(m);
     return m;
+}
+
+
+
+function reverseDict ( dict ) {
+    var newDict = {};
+    for (var key in dict) {
+        newDict[dict[key]] = key;
+    }
+    return newDict
+}
+
+
+MAVLink20Processor.prototype.get_name_from_enum = function(field_enum, value) {
+    if (field_enum === undefined) {
+        return value
+    }
+    const enum_ = mavlink20[field_enum]
+    if (enum_ === undefined) {
+        return value
+    }
+    if (!(field_enum in this.reverseDicts)) {
+        this.reverseDicts[field_enum] = reverseDict(enum_)
+    }
+    if (field_enum in this.reverseDicts) {
+      if (!(value in this.reverseDicts[field_enum])) {
+        return value
+      }
+        return this.reverseDicts[field_enum][value]
+    }
+}
+
+
+MAVLink20Processor.prototype.toMavlink2RestV1Format = function(message) {
+  const obj = {
+    header: {
+      sequence: message._header.seq,
+      system_id: message._header.srcSystem,
+      component_id: message._header.srcComponent,
+    },
+    message: {
+      type: message._name,
+    }
+  }
+  for (let index=0; index< message.fieldnames.length; index++) {
+    const fieldname = message.fieldnames[index]
+    const field_enum = message.field_enums[index]
+    const field_bitmask = message.field_bitmasks[index]
+    if (field_bitmask) {
+      obj.message[fieldname] = { bits: message[fieldname] }
+    } else if (typeof field_enum === 'string' && field_enum.length > 0) {
+      obj.message[fieldname] = { type: this.get_name_from_enum(field_enum, message[fieldname]) }
+    } else {
+      let data = message[fieldname]
+      if (typeof data == 'string') {
+        data = data.split('')
+      }
+      obj.message[fieldname] = data
+    }
+  }
+  if ("type" in obj.message) {
+    obj["message"]["mavtype"] = obj.message.type
+  }
+  obj["message"]["type"] = message._name
+  return obj
 }
 
 """, {'MAVHEAD': get_mavhead(xml), 'MAVPROCESSOR': get_mavprocessor(xml), 'PROTOCOL_MARKER' : xml.protocol_marker})

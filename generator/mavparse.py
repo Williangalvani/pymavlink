@@ -243,6 +243,7 @@ class MAVXML(object):
 
         def start_element(name, attrs):
             in_element_list.append(name)
+            print(attrs)
             in_element = '.'.join(in_element_list)
             #print in_element
             if in_element == "mavlink.messages.message":
@@ -253,7 +254,9 @@ class MAVXML(object):
             elif in_element == "mavlink.messages.message.field":
                 check_attrs(attrs, ['name', 'type'], 'field')
                 print_format = attrs.get('print_format', None)
-                enum = attrs.get('enum', '')
+                enum_name = attrs.get('enum', '')
+                enums = [enum for enum in self.enum if enum.name == enum_name]
+                enum = enums[0] if enums else None
                 display = attrs.get('display', '')
                 units = attrs.get('units', '')
                 if units:
@@ -380,6 +383,8 @@ class MAVXML(object):
             m.wire_length = 0
             m.wire_min_length = 0
             m.fieldnames = []
+            m.field_enums = []
+            m.field_bitmasks = []
             m.fieldlengths = []
             m.ordered_fieldnames = []
             m.ordered_fieldtypes = []
@@ -399,7 +404,13 @@ class MAVXML(object):
             else:
                 m.ordered_fields = m.fields
             for f in m.fields:
+                import pprint
+                pprint.pprint(vars(f))
                 m.fieldnames.append(f.name)
+                m.field_enums.append(f.enum if f.enum else None)
+                if f.enum:
+                    print(f.enum)
+                m.field_bitmasks.append(f.enum.bitmask if f.enum else False)
                 L = f.array_length
                 if L == 0:
                     m.fieldlengths.append(1)
@@ -568,7 +579,7 @@ def check_missing_enum(xml):
     for x in xml:
         for m in x.message:
             for f in m.fields:
-                if f.enum and f.enum not in all_enums:
+                if f.enum and f.enum.name not in all_enums:
                     print('Enum %s in %s.%s does not exist' % (f.enum, m.name, f.name))
                     return True
     return False
